@@ -189,7 +189,14 @@ class MainActivity : FragmentActivity() {
         }
         val reported = cameraFragment?.availableSizes().orEmpty()
         val modes = (reported + listOf(
-            640 to 480, 1280 to 720, 1920 to 1080, 2560 to 1440
+            640 to 480,
+            1280 to 720,
+            1920 to 1080,
+            2560 to 1440,
+            3840 to 3104,
+            3840 to 2160,
+            4624 to 3468,
+            4168 to 3126
         )).distinct().sortedByDescending { it.first.toLong() * it.second }
         box.addView(heading("Разрешение камеры"))
         val sizeSpin = Spinner(this).apply {
