@@ -1,29 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
-    <application
-        android:allowBackup="false"
-        android:label="OTG Интервальная камера"
-        android:theme="@style/AppTheme"
-        android:supportsRtl="true">
-        <activity
-            android:name=".MainActivity"
-            android:screenOrientation="unspecified"
-            android:exported="true"
-            android:showWhenLocked="false">
+    <uses-feature android:name="android.hardware.usb.host" android:required="true"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.software.picture_in_picture" android:required="false"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <application android:allowBackup="false" android:label="OTG Интервальная камера"
+        android:theme="@style/AppTheme" android:supportsRtl="true">
+        <activity android:name=".MainActivity" android:exported="true"
+            android:resizeableActivity="true" android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <receiver
-            android:name=".KioskAdminReceiver"
-            android:exported="true"
-            android:permission="android.permission.BIND_DEVICE_ADMIN">
-            <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin" />
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

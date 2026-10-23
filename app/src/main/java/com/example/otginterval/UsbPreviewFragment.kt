@@ -13,74 +13,52 @@ import com.jiangdg.ausbc.camera.bean.CameraRequest
 import com.jiangdg.ausbc.widget.AspectRatioTextureView
 import com.jiangdg.ausbc.widget.IAspectRatio
 
-/** AUSBC handles USB permission, UVC decoding and preview. */
 class UsbPreviewFragment : CameraFragment() {
-    private var previewContainer: FrameLayout? = null
-    private var cameraView: AspectRatioTextureView? = null
-
+    private var frame: FrameLayout? = null
+    private var texture: AspectRatioTextureView? = null
     override fun getRootView(inflater: LayoutInflater, container: ViewGroup?): View {
-        val ctx = requireContext()
-        val root = FrameLayout(ctx)
-        val texture = AspectRatioTextureView(ctx)
-        root.addView(texture, FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            Gravity.CENTER
-        ))
-        previewContainer = root
-        cameraView = texture
+        val root = FrameLayout(requireContext())
+        val view = AspectRatioTextureView(requireContext())
+        root.addView(view, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
+        frame = root
+        texture = view
         return root
     }
-
-    override fun getCameraView(): IAspectRatio? = cameraView
-
-    override fun getCameraViewContainer(): ViewGroup? = previewContainer
-
+    override fun getCameraView(): IAspectRatio? = texture
+    override fun getCameraViewContainer(): ViewGroup? = frame
     override fun getGravity(): Int = Gravity.CENTER
-
-    override fun getCameraRequest(): CameraRequest = CameraRequest.Builder()
-        .setPreviewWidth(1280)
-        .setPreviewHeight(720)
-        .setPreviewFormat(CameraRequest.PreviewFormat.FORMAT_MJPEG)
-        .setRenderMode(CameraRequest.RenderMode.OPENGL)
-        .setAudioSource(CameraRequest.AudioSource.NONE)
-        .create()
-
+    override fun getCameraRequest(): CameraRequest {
+        val prefs = requireContext().getSharedPreferences("camera_settings", 0)
+        val w = prefs.getInt("width", 640)
+        val h = prefs.getInt("height", 480)
+        val f = prefs.getString("format", "AUTO")
+        val mjpeg = f == "MJPEG" || (f == "AUTO" && w * h > 640 * 480)
+        return CameraRequest.Builder().setPreviewWidth(w).setPreviewHeight(h)
+            .setPreviewFormat(if (mjpeg) CameraRequest.PreviewFormat.FORMAT_MJPEG
+                else CameraRequest.PreviewFormat.FORMAT_YUYV)
+            .setRenderMode(CameraRequest.RenderMode.OPENGL)
+            .setAudioSource(CameraRequest.AudioSource.NONE).create()
+    }
     override fun onCameraState(self: MultiCameraClient.ICamera,
-                               code: ICameraStateCallBack.State,
-                               msg: String?) {
+        code: ICameraStateCallBack.State, msg: String?) {
         val host = activity as? MainActivity ?: return
         when (code) {
             ICameraStateCallBack.State.OPENED -> host.onUsbState(true, null)
             ICameraStateCallBack.State.CLOSED -> host.onUsbState(false, "Камера отключена")
-            ICameraStateCallBack.State.ERROR -> host.onUsbState(false, msg ?: "Ошибка USB-камеры")
+            ICameraStateCallBack.State.ERROR -> host.onUsbState(false, msg ?: "Ошибка USB UVC")
         }
     }
-
     fun availableSizes(): List<Pair<Int, Int>> =
-        getCurrentCamera()?.getAllPreviewSizes()
-            ?.map { it.width to it.height }
-            ?.distinct()
-            ?.sortedWith(compareByDescending<Pair<Int, Int>> { it.first * it.second })
-            ?: emptyList()
-
-    fun changeSize(width: Int, height: Int) {
-        getCurrentCamera()?.updateResolution(width, height)
-    }
-
-    fun takeShot(targetPath: String, callback: ICaptureCallBack) {
-        if (getCurrentCamera()?.isCameraOpened() != true) {
-            callback.onError("USB-камера не открыта")
-            return
-        }
-        captureImage(callback, targetPath)
-    }
-
+        getCurrentCamera()?.getAllPreviewSizes()?.map { it.width to it.height }
+            ?.distinct()?.sortedByDescending { it.first.toLong() * it.second } ?: emptyList()
     fun isReady(): Boolean = getCurrentCamera()?.isCameraOpened() == true
-
+    fun takeShot(path: String, callback: ICaptureCallBack) {
+        if (!isReady()) { callback.onError("USB-камера не открыта"); return }
+        captureImage(callback, path)
+    }
     override fun onDestroyView() {
-        cameraView = null
-        previewContainer = null
+        texture = null
+        frame = null
         super.onDestroyView()
     }
 }
