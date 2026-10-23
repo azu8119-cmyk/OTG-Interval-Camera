@@ -37,6 +37,10 @@ class UsbPreviewFragment : CameraFragment() {
             .setPreviewFormat(if (mjpeg) CameraRequest.PreviewFormat.FORMAT_MJPEG
                 else CameraRequest.PreviewFormat.FORMAT_YUYV)
             .setRenderMode(CameraRequest.RenderMode.OPENGL)
+            // Capture full-size NV21 data directly from the USB camera instead
+            // of saving the screen-sized OpenGL preview (e.g. 1080×607).
+            .setRawPreviewData(true)
+            .setCaptureRawImage(true)
             .setAudioSource(CameraRequest.AudioSource.NONE).create()
     }
     override fun onCameraState(self: MultiCameraClient.ICamera,
@@ -51,6 +55,9 @@ class UsbPreviewFragment : CameraFragment() {
     fun availableSizes(): List<Pair<Int, Int>> =
         getCurrentCamera()?.getAllPreviewSizes()?.map { it.width to it.height }
             ?.distinct()?.sortedByDescending { it.first.toLong() * it.second } ?: emptyList()
+    fun activeSize(): Pair<Int, Int>? = getCurrentCamera()?.getCameraRequest()?.let {
+        it.previewWidth to it.previewHeight
+    }
     fun isReady(): Boolean = getCurrentCamera()?.isCameraOpened() == true
     fun takeShot(path: String, callback: ICaptureCallBack) {
         if (!isReady()) { callback.onError("USB-камера не открыта"); return }

@@ -147,7 +147,9 @@ class MainActivity : FragmentActivity() {
         runOnUiThread {
             cameraIsOpen = opened
             if (!opened && takingSeries) stopSeries()
-            status(if (opened) "USB-камера открыта. Нажмите ⚙" else
+            val size = cameraFragment?.activeSize()
+            status(if (opened) "USB-камера открыта. Поток: " +
+                (size?.let { "${it.first}×${it.second}" } ?: "неизвестно") + ". Нажмите ⚙" else
                 (detail ?: "Нет видеопотока") + ". USB-устройств: " + usbCount())
         }
     }
@@ -297,10 +299,26 @@ class MainActivity : FragmentActivity() {
                 val actual = path?.takeIf { it.isNotBlank() } ?: temp.absolutePath
                 writer.execute {
                     try {
+                        val bounds = android.graphics.BitmapFactory.Options().apply {
+                            inJustDecodeBounds = true
+                        }
+                        android.graphics.BitmapFactory.decodeFile(actual, bounds)
+                        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                            throw java.io.IOException("JPEG не распознан")
+                        }
                         PhotoWriter.moveToChosenFolder(applicationContext, tree, actual, fileName)
                         runOnUiThread {
                             photoCount++
-                            if (takingSeries) status("Сохранено " + photoCount + " фото")
+                            val size = bounds.outWidth.toString() + "×" + bounds.outHeight
+                            val expected = cameraFragment?.activeSize()
+                            if (expected != null && (bounds.outWidth != expected.first ||
+                                    bounds.outHeight != expected.second)) {
+                                status("Сохранён JPEG " + size + ", поток " +
+                                    expected.first + "×" + expected.second +
+                                    ". Проверьте разрешение камеры.")
+                            } else {
+                                status("Сохранено " + photoCount + " фото · JPEG " + size)
+                            }
                         }
                     } catch (ex: Exception) {
                         runOnUiThread { status("Ошибка записи: " + ex.localizedMessage) }
