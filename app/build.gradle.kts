@@ -29,3 +29,10 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("com.github.ernestp.AndroidUSBCamera:libausbc:3.6.0")
 }
+
+configurations.configureEach {
+    resolutionStrategy.force(
+        "androidx.core:core:1.16.0",
+        "androidx.core:core-ktx:1.16.0"
+    )
+}
