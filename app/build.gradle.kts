@@ -9,8 +9,8 @@ android {
         applicationId = "com.example.otginterval"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2-usb-pip"
+        versionCode = 3
+        versionName = "0.3-layout"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -2,13 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.hardware.usb.host" android:required="true"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
-    <uses-feature android:name="android.software.picture_in_picture" android:required="false"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <application android:allowBackup="false" android:label="OTG Интервальная камера"
         android:theme="@style/AppTheme" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true"
-            android:resizeableActivity="true" android:supportsPictureInPicture="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation">
+            android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

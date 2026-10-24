@@ -2,18 +2,15 @@ package com.example.otginterval
 
 import android.Manifest
 import android.app.AlertDialog
-import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.graphics.Color
 import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Rational
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -40,7 +37,6 @@ class MainActivity : FragmentActivity() {
     private lateinit var statusText: TextView
     private lateinit var folderButton: Button
     private lateinit var settingsButton: Button
-    private lateinit var pipButton: Button
     private var cameraFragment: UsbPreviewFragment? = null
     private var folderUri: Uri? = null
     private var intervalSeconds = 5
@@ -102,21 +98,16 @@ class MainActivity : FragmentActivity() {
             setPadding(dp(12), dp(9), dp(12), dp(9))
             maxLines = 4
         }
-        root.addView(statusText, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        root.addView(statusText, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            setMargins(0, 0, 0, dp(36))
+        })
         settingsButton = Button(this).apply {
             text = "⚙"
             textSize = 24f
             setOnClickListener { settings() }
         }
         root.addView(settingsButton, FrameLayout.LayoutParams(dp(60), dp(56),
-            Gravity.TOP or Gravity.END).apply { setMargins(0, dp(10), dp(12), 0) })
-        pipButton = Button(this).apply {
-            text = "▣"
-            contentDescription = "Показать поверх приложений (PiP)"
-            setOnClickListener { floatingWindow() }
-        }
-        root.addView(pipButton, FrameLayout.LayoutParams(dp(58), dp(56),
-            Gravity.TOP or Gravity.START).apply { setMargins(dp(12), dp(10), 0, 0) })
+            Gravity.TOP or Gravity.END).apply { setMargins(0, dp(42), dp(12), 0) })
         setContentView(root)
         folderButton.visibility = if (folderUri == null) View.VISIBLE else View.GONE
     }
@@ -333,30 +324,6 @@ class MainActivity : FragmentActivity() {
                 }
             }
         })
-    }
-    private fun floatingWindow() {
-        if (!cameraIsOpen ||
-            !packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
-            Toast.makeText(this, "PiP недоступен или камера не открыта", Toast.LENGTH_LONG).show()
-            return
-        }
-        try {
-            enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(
-                Rational(prefs.getInt("width", 640), prefs.getInt("height", 480))).build())
-        } catch (ex: Exception) {
-            Toast.makeText(this, "Ошибка PiP: " + ex.localizedMessage, Toast.LENGTH_LONG).show()
-        }
-    }
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        if (cameraIsOpen && !isInPictureInPictureMode) floatingWindow()
-    }
-    override fun onPictureInPictureModeChanged(inPip: Boolean, cfg: Configuration) {
-        super.onPictureInPictureModeChanged(inPip, cfg)
-        settingsButton.visibility = if (inPip) View.GONE else View.VISIBLE
-        pipButton.visibility = if (inPip) View.GONE else View.VISIBLE
-        statusText.visibility = if (inPip) View.GONE else View.VISIBLE
-        folderButton.visibility = if (inPip || folderUri != null) View.GONE else View.VISIBLE
     }
     private fun status(s: String) { statusText.text = s }
     override fun onDestroy() {
