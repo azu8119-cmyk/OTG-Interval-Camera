@@ -1,9 +1,16 @@
-# OTG Interval Camera 0.3
+# OTG Interval Camera v0.4
 
-Samsung Galaxy S25 / OTG UVC camera. Real JPEG frames, user-selected save directory, 1–300 second intervals, MJPEG/YUYV, USB diagnostics, and resolution selection (including 2560×1440, 3840×3104, 3840×2160, 4624×3468, 4168×3126, if supported by hardware).
+Samsung S25 UVC USB camera. Native-resolution JPEG, save-folder selection, 1–300 second interval, MJPEG/YUYV, diagnostics and the existing high-resolution camera presets.
 
-The screen stays awake while the app is displayed (FLAG_KEEP_SCREEN_ON). Picture-in-Picture, kiosk mode, touch lock, and system button blocking are not used. The settings gear is shifted 32 dp lower; status text is raised 36 dp from the bottom.
+## Updated controls
+- Status line raised from 36 dp to 64 dp above the bottom.
+- Main-screen **Старт / Стоп** button located below the settings gear.
+- **Two taps within 500 ms** to start, stop, or cancel a scheduled session. A single tap does nothing.
+- Settings have an optional switch for start/end times (24-hour local phone time). Set them with time pickers, then press **Сохранить настройки**.
+- When armed by double-tap, a single scheduled session starts at the configured start time (immediately if within the active time window) and stops at end time. Crossing midnight is supported. If a time has passed, it schedules the next occurrence. It is not an automatically recurring daily task.
+- With the schedule switch off, double-tap starts immediately and stops only on another double-tap.
+- **FLAG_KEEP_SCREEN_ON** remains active while the app is visible. No PiP, kiosk or touch blocking.
 
-The camera preview and interval shooting are intended to run with the app visible; the app does not provide a persistent background USB capture service.
+**Important:** This scheduling uses Android Activity timers and needs the app to remain open and active. It cannot guarantee running while the app is closed, backgrounded or killed, and it does not restore an armed session after a restart.
 
-Build with GitHub Actions -> Build APK -> Artifacts -> OTG-Camera-APK.
+Build via GitHub Actions -> Build APK -> Artifacts -> OTG-Camera-APK.
