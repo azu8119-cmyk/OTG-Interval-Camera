@@ -87,6 +87,9 @@ class MainActivity : FragmentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         folderUri = prefs.getString("folder", null)?.let(Uri::parse)
         intervalSeconds = prefs.getInt("interval", 5).coerceIn(1, 300)
+        scheduleEnabled = prefs.getBoolean("schedule_enabled", false)
+        startMinutes = prefs.getInt("start_minutes", 8 * 60).coerceIn(0, 1439)
+        endMinutes = prefs.getInt("end_minutes", 18 * 60).coerceIn(0, 1439)
         buildUi()
         if (folderUri == null) root.post { chooseFolder.launch(null) }
         else connectCamera()
@@ -292,42 +295,44 @@ class MainActivity : FragmentActivity() {
             .setView(ScrollView(this).apply { addView(box) })
             .setNegativeButton("Закрыть", null).create()
         fun save(): Boolean {
+            if (takingSeries || waitingForStart) {
+                Toast.makeText(this, "Сначала остановите съёмку или ожидание",
+                    Toast.LENGTH_LONG).show()
+                return false
+            }
             val n = field.text.toString().toIntOrNull()
             if (n == null || n !in 1..300) {
                 field.error = "Введите число 1–300"
                 return false
             }
+            if (timeCheck.isChecked && chosenStart == chosenEnd) {
+                Toast.makeText(this, "Время начала и окончания не должно совпадать",
+                    Toast.LENGTH_LONG).show()
+                return false
+            }
             intervalSeconds = n
+            scheduleEnabled = timeCheck.isChecked
+            startMinutes = chosenStart
+            endMinutes = chosenEnd
             val mode = modes[sizeSpin.selectedItemPosition]
             prefs.edit().putInt("interval", n).putInt("width", mode.first)
                 .putInt("height", mode.second)
-                .putString("format", formats[fmtSpin.selectedItemPosition]).apply()
+                .putString("format", formats[fmtSpin.selectedItemPosition])
+                .putBoolean("schedule_enabled", scheduleEnabled)
+                .putInt("start_minutes", startMinutes)
+                .putInt("end_minutes", endMinutes).apply()
             return true
         }
-        choose.setOnClickListener { if (!takingSeries) { dialog.dismiss(); chooseFolder.launch(null) } }
+        choose.setOnClickListener { if (!takingSeries && !waitingForStart) { dialog.dismiss(); chooseFolder.launch(null) } }
         retry.setOnClickListener { dialog.dismiss(); reconnectPreview() }
         diag.setOnClickListener { diagnostics() }
         apply.setOnClickListener {
-            if (!takingSeries && save()) { dialog.dismiss(); reconnectPreview() }
+            if (!takingSeries && !waitingForStart && save()) { dialog.dismiss(); reconnectPreview() }
         }
-        start.setOnClickListener {
-            if (takingSeries) { stopSeries(); dialog.dismiss() }
-            else {
-                val old = Triple(prefs.getInt("width", 640),
-                    prefs.getInt("height", 480), prefs.getString("format", "AUTO"))
-                if (!save()) return@setOnClickListener
-                val now = Triple(prefs.getInt("width", 640),
-                    prefs.getInt("height", 480), prefs.getString("format", "AUTO"))
-                if (old != now) {
-                    dialog.dismiss()
-                    reconnectPreview()
-                    Toast.makeText(this, "Выбран новый режим. После появления видео повторите запуск.",
-                        Toast.LENGTH_LONG).show()
-                } else if (folderUri == null || !cameraIsOpen ||
-                    cameraFragment?.isReady() != true) {
-                    Toast.makeText(this, "Выберите папку и подключите USB-камеру",
-                        Toast.LENGTH_LONG).show()
-                } else { dialog.dismiss(); startSeries() }
+        saveButton.setOnClickListener {
+            if (save()) {
+                dialog.dismiss()
+                Toast.makeText(this, "Настройки сохранены", Toast.LENGTH_SHORT).show()
             }
         }
         dialog.show()
