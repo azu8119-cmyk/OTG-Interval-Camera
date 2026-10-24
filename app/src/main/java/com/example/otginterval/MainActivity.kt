@@ -242,14 +242,52 @@ class MainActivity : FragmentActivity() {
             setText(intervalSeconds.toString())
         }
         box.addView(field)
+        box.addView(heading("Время начала и окончания (время телефона)"))
+        val timeCheck = CheckBox(this).apply {
+            text = "Использовать расписание"
+            isChecked = scheduleEnabled
+        }
+        box.addView(timeCheck)
+        var chosenStart = startMinutes
+        var chosenEnd = endMinutes
+        fun timeText(minutes: Int) = String.format(
+            Locale.US, "%02d:%02d", minutes / 60, minutes % 60)
+        val startTimeButton = Button(this).apply {
+            text = "Начало: " + timeText(chosenStart)
+        }
+        val endTimeButton = Button(this).apply {
+            text = "Окончание: " + timeText(chosenEnd)
+        }
+        startTimeButton.setOnClickListener {
+            TimePickerDialog(this, { _, hour, minute ->
+                chosenStart = hour * 60 + minute
+                startTimeButton.text = "Начало: " + timeText(chosenStart)
+            }, chosenStart / 60, chosenStart % 60, true).show()
+        }
+        endTimeButton.setOnClickListener {
+            TimePickerDialog(this, { _, hour, minute ->
+                chosenEnd = hour * 60 + minute
+                endTimeButton.text = "Окончание: " + timeText(chosenEnd)
+            }, chosenEnd / 60, chosenEnd % 60, true).show()
+        }
+        box.addView(startTimeButton)
+        box.addView(endTimeButton)
+        box.addView(TextView(this).apply {
+            text = "Если окончание раньше начала, съёмка закончится на следующий день. " +
+                "Без расписания двойное нажатие запускает съёмку сразу."
+        })
+        timeCheck.setOnCheckedChangeListener { _, enabled ->
+            startTimeButton.isEnabled = enabled
+            endTimeButton.isEnabled = enabled
+        }
+        startTimeButton.isEnabled = timeCheck.isChecked
+        endTimeButton.isEnabled = timeCheck.isChecked
         val choose = Button(this).apply { text = "Изменить папку" }
         val retry = Button(this).apply { text = "Переподключить USB-камеру" }
         val diag = Button(this).apply { text = "Диагностика USB" }
         val apply = Button(this).apply { text = "Применить разрешение" }
-        val start = Button(this).apply {
-            text = if (takingSeries) "Остановить съёмку" else "Начать съёмку"
-        }
-        listOf(choose, retry, diag, apply, start).forEach(box::addView)
+        val saveButton = Button(this).apply { text = "Сохранить настройки" }
+        listOf(choose, retry, diag, apply, saveButton).forEach(box::addView)
         val dialog = AlertDialog.Builder(this).setTitle("Настройки камеры")
             .setView(ScrollView(this).apply { addView(box) })
             .setNegativeButton("Закрыть", null).create()
