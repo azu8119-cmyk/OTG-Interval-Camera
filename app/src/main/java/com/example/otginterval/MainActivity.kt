@@ -2,6 +2,7 @@ package com.example.otginterval
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +12,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +24,7 @@ import com.jiangdg.ausbc.callback.ICaptureCallBack
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -37,10 +40,18 @@ class MainActivity : FragmentActivity() {
     private lateinit var statusText: TextView
     private lateinit var folderButton: Button
     private lateinit var settingsButton: Button
+    private lateinit var seriesButton: Button
     private var cameraFragment: UsbPreviewFragment? = null
     private var folderUri: Uri? = null
     private var intervalSeconds = 5
     private var takingSeries = false
+    private var waitingForStart = false
+    private var scheduledStartMillis = 0L
+    private var scheduledEndMillis = 0L
+    private var scheduleEnabled = false
+    private var startMinutes = 8 * 60
+    private var endMinutes = 18 * 60
+    private var lastStartButtonTap = 0L
     private var cameraIsOpen = false
     private var photoCount = 0
 
@@ -99,7 +110,7 @@ class MainActivity : FragmentActivity() {
             maxLines = 4
         }
         root.addView(statusText, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
-            setMargins(0, 0, 0, dp(36))
+            setMargins(0, 0, 0, dp(64))
         })
         settingsButton = Button(this).apply {
             text = "⚙"
@@ -108,6 +119,22 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(settingsButton, FrameLayout.LayoutParams(dp(60), dp(56),
             Gravity.TOP or Gravity.END).apply { setMargins(0, dp(42), dp(12), 0) })
+        seriesButton = Button(this).apply {
+            textSize = 16f
+            contentDescription = "Двойное нажатие: начать или остановить съёмку"
+            setOnClickListener {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastStartButtonTap in 1..500) {
+                    lastStartButtonTap = 0L
+                    toggleSeries()
+                } else {
+                    lastStartButtonTap = now
+                }
+            }
+        }
+        root.addView(seriesButton, FrameLayout.LayoutParams(dp(130), dp(56),
+            Gravity.TOP or Gravity.END).apply { setMargins(0, dp(112), dp(12), 0) })
+        updateSeriesButton()
         setContentView(root)
         folderButton.visibility = if (folderUri == null) View.VISIBLE else View.GONE
     }
