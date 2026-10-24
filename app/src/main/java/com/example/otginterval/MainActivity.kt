@@ -337,18 +337,114 @@ class MainActivity : FragmentActivity() {
         }
         dialog.show()
     }
+    private fun isSessionArmed() = takingSeries || waitingForStart
+
+    private fun updateSeriesButton() {
+        seriesButton.text = when {
+            takingSeries -> "■ Стоп"
+            waitingForStart -> "■ Отмена"
+            else -> "▶ Старт"
+        }
+    }
+
+    private fun toggleSeries() {
+        if (isSessionArmed()) {
+            stopSeries()
+            return
+        }
+        if (folderUri == null || !cameraIsOpen || cameraFragment?.isReady() != true) {
+            Toast.makeText(this, "Сначала выберите папку и подключите USB-камеру",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        photoCount = 0
+        if (scheduleEnabled) armScheduledSession() else {
+            scheduledStartMillis = 0L
+            scheduledEndMillis = 0L
+            startSeries()
+        }
+    }
+
+    private fun atTime(base: Calendar, minutes: Int): Calendar =
+        (base.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, minutes / 60)
+            set(Calendar.MINUTE, minutes % 60)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+    private fun armScheduledSession() {
+        val now = System.currentTimeMillis()
+        val today = Calendar.getInstance()
+        val todayStart = atTime(today, startMinutes)
+        val todayEnd = atTime(today, endMinutes)
+        if (endMinutes <= startMinutes) todayEnd.add(Calendar.DATE, 1)
+        val yesterdayStart = (todayStart.clone() as Calendar).apply {
+            add(Calendar.DATE, -1)
+        }
+        val yesterdayEnd = (todayEnd.clone() as Calendar).apply {
+            add(Calendar.DATE, -1)
+        }
+        val selectedStart: Calendar
+        val selectedEnd: Calendar
+        when {
+            endMinutes < startMinutes &&
+                now >= yesterdayStart.timeInMillis && now < yesterdayEnd.timeInMillis -> {
+                selectedStart = yesterdayStart
+                selectedEnd = yesterdayEnd
+            }
+            now >= todayStart.timeInMillis && now < todayEnd.timeInMillis -> {
+                selectedStart = todayStart
+                selectedEnd = todayEnd
+            }
+            now < todayStart.timeInMillis -> {
+                selectedStart = todayStart
+                selectedEnd = todayEnd
+            }
+            else -> {
+                selectedStart = (todayStart.clone() as Calendar).apply {
+                    add(Calendar.DATE, 1)
+                }
+                selectedEnd = (todayEnd.clone() as Calendar).apply {
+                    add(Calendar.DATE, 1)
+                }
+            }
+        }
+        scheduledStartMillis = selectedStart.timeInMillis
+        scheduledEndMillis = selectedEnd.timeInMillis
+        ui.removeCallbacks(scheduleMonitor)
+        if (now >= scheduledStartMillis) {
+            startSeries()
+        } else {
+            waitingForStart = true
+            updateSeriesButton()
+            val fmt = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
+            status("Ожидание начала: " + fmt.format(Date(scheduledStartMillis)) +
+                ". Двойное нажатие — отмена")
+        }
+        ui.post(scheduleMonitor)
+    }
+
     private fun startSeries() {
         if (takingSeries || !cameraIsOpen) return
+        waitingForStart = false
         takingSeries = true
-        photoCount = 0
+        updateSeriesButton()
         ui.removeCallbacks(tick)
         ui.post(tick)
-        status("Съёмка каждые " + intervalSeconds + " с. Экран не гаснет")
+        status("Съёмка каждые " + intervalSeconds + " с · " + photoCount + " фото")
     }
+
     private fun stopSeries() {
+        val wasArmed = isSessionArmed()
         takingSeries = false
+        waitingForStart = false
         ui.removeCallbacks(tick)
-        status("Остановлено. Сохранено фото: " + photoCount)
+        ui.removeCallbacks(scheduleMonitor)
+        scheduledStartMillis = 0L
+        scheduledEndMillis = 0L
+        updateSeriesButton()
+        if (wasArmed) status("Остановлено. Сохранено фото: " + photoCount)
     }
     private fun capture() {
         val tree = folderUri
