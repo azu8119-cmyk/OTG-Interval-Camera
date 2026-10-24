@@ -55,6 +55,30 @@ class MainActivity : FragmentActivity() {
     private var cameraIsOpen = false
     private var photoCount = 0
 
+    private val scheduleMonitor = object : Runnable {
+        override fun run() {
+            if (!waitingForStart && !takingSeries) return
+            if (scheduledEndMillis <= 0L) return
+            val now = System.currentTimeMillis()
+            if (now >= scheduledEndMillis) {
+                stopSeries()
+                status("Время окончания достигнуто. Сохранено: " + photoCount + " фото")
+                return
+            }
+            if (waitingForStart && now >= scheduledStartMillis) {
+                if (cameraIsOpen && cameraFragment?.isReady() == true) {
+                    waitingForStart = false
+                    startSeries()
+                } else {
+                    stopSeries()
+                    status("Запуск отменён: USB-камера недоступна")
+                    return
+                }
+            }
+            ui.postDelayed(this, 500L)
+        }
+    }
+
     private val requestCamera = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -77,6 +101,11 @@ class MainActivity : FragmentActivity() {
     private val tick = object : Runnable {
         override fun run() {
             if (!takingSeries) return
+            if (scheduledEndMillis > 0L && System.currentTimeMillis() >= scheduledEndMillis) {
+                stopSeries()
+                status("Время окончания достигнуто. Сохранено: " + photoCount + " фото")
+                return
+            }
             if (cameraIsOpen && writing.compareAndSet(false, true)) capture()
             if (takingSeries) ui.postDelayed(this, intervalSeconds * 1000L)
         }
@@ -154,8 +183,8 @@ class MainActivity : FragmentActivity() {
         reconnectPreview()
     }
     private fun reconnectPreview() {
-        if (takingSeries) {
-            Toast.makeText(this, "Сначала остановите съёмку", Toast.LENGTH_SHORT).show()
+        if (takingSeries || waitingForStart) {
+            Toast.makeText(this, "Сначала остановите съёмку или ожидание", Toast.LENGTH_SHORT).show()
             return
         }
         cameraIsOpen = false
@@ -167,7 +196,7 @@ class MainActivity : FragmentActivity() {
     fun onUsbState(opened: Boolean, detail: String?) {
         runOnUiThread {
             cameraIsOpen = opened
-            if (!opened && takingSeries) stopSeries()
+            if (!opened && (takingSeries || waitingForStart)) stopSeries()
             val size = cameraFragment?.activeSize()
             status(if (opened) "USB-камера открыта. Поток: " +
                 (size?.let { "${it.first}×${it.second}" } ?: "неизвестно") + ". Нажмите ⚙" else
@@ -495,6 +524,7 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         takingSeries = false
         ui.removeCallbacks(tick)
+        ui.removeCallbacks(scheduleMonitor)
         writer.shutdown()
         super.onDestroy()
     }
