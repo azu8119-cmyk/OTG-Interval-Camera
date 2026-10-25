@@ -1,16 +1,28 @@
-# OTG Interval Camera v0.4
+# OTG Interval Camera v0.5 — Touch Lock
 
-Samsung S25 UVC USB camera. Native-resolution JPEG, save-folder selection, 1–300 second interval, MJPEG/YUYV, diagnostics and the existing high-resolution camera presets.
+Samsung Galaxy S25 / USB OTG UVC. Native-resolution JPEG photos, selectable camera resolution (including 2560×1440 / 3840×2160 / 4624×3468 where supported), MJPEG/YUYV, photo interval 1–300 seconds, optional start/end time, selected save folder and USB diagnostics.
 
-## Updated controls
-- Status line raised from 36 dp to 64 dp above the bottom.
-- Main-screen **Старт / Стоп** button located below the settings gear.
-- **Two taps within 500 ms** to start, stop, or cancel a scheduled session. A single tap does nothing.
-- Settings have an optional switch for start/end times (24-hour local phone time). Set them with time pickers, then press **Сохранить настройки**.
-- When armed by double-tap, a single scheduled session starts at the configured start time (immediately if within the active time window) and stops at end time. Crossing midnight is supported. If a time has passed, it schedules the next occurrence. It is not an automatically recurring daily task.
-- With the schedule switch off, double-tap starts immediately and stops only on another double-tap.
-- **FLAG_KEEP_SCREEN_ON** remains active while the app is visible. No PiP, kiosk or touch blocking.
+## Touch lock (without Knox, root or reset)
 
-**Important:** This scheduling uses Android Activity timers and needs the app to remain open and active. It cannot guarantee running while the app is closed, backgrounded or killed, and it does not restore an armed session after a restart.
+- Tap the **🔒** button in the top-left of the main camera screen.
+- Touch input inside the app is blocked with a transparent overlay. Camera preview and timed photo capture continue.
+- The **settings** and **Start/Stop** controls are hidden while locked.
+- To unlock, swipe deliberately **left to right** across the screen, starting in its left half. A horizontal swipe of at least 140 dp unlocks.
+- Screen stays on when the app is visible. Status and navigation bars are temporarily hidden using immersive mode; Android may reveal them with system gestures.
 
-Build via GitHub Actions -> Build APK -> Artifacts -> OTG-Camera-APK.
+### Optional stronger Android screen pinning
+
+- In app settings, toggle **Закреплять приложение (блокировать Home и Недавние)** (enabled by default).
+- On Samsung Galaxy: Settings → Security and privacy → More security settings → Allow apps to be pinned. Turn it on.
+- Upon locking, Android may show a screen pinning confirmation; **accept it**. Unlocking with the app's right swipe calls `stopLockTask()` to release pinning.
+- System unpin gestures remain available and may require the phone PIN. This is normal Android app pinning, **not** Device Owner / Knox. It does not guarantee that the status shade or every system action is permanently disabled.
+- Without screen pinning permission, the app-local touch shield still functions.
+
+## Other controls
+
+- Tap **▶ Старт / ■ Стоп** twice within 500 ms to start/stop a shooting session.
+- Optional scheduled start/end uses phone time and keeps working while this activity remains running and responsive. It does not guarantee background execution.
+- Screen stays awake while the app is visible.
+- No PiP, no root, no accessibility or device-admin permission.
+
+GitHub Actions → Build APK → Artifacts → OTG-Camera-APK.
