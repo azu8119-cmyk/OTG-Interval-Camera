@@ -1,6 +1,8 @@
 package com.example.otginterval
 
 import android.Manifest
+import android.app.ActivityManager
+import android.os.Build
 import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.content.Context
@@ -14,11 +16,14 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import com.jiangdg.ausbc.callback.ICaptureCallBack
 import java.io.File
@@ -41,6 +46,10 @@ class MainActivity : FragmentActivity() {
     private lateinit var folderButton: Button
     private lateinit var settingsButton: Button
     private lateinit var seriesButton: Button
+    private lateinit var lockButton: Button
+    private var touchLockOverlay: TouchLockOverlay? = null
+    private var touchLocked = false
+    private var pinRequestByApp = false
     private var cameraFragment: UsbPreviewFragment? = null
     private var folderUri: Uri? = null
     private var intervalSeconds = 5
@@ -120,6 +129,14 @@ class MainActivity : FragmentActivity() {
         startMinutes = prefs.getInt("start_minutes", 8 * 60).coerceIn(0, 1439)
         endMinutes = prefs.getInt("end_minutes", 18 * 60).coerceIn(0, 1439)
         buildUi()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (touchLocked) return
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        })
         if (folderUri == null) root.post { chooseFolder.launch(null) }
         else connectCamera()
     }
@@ -167,6 +184,14 @@ class MainActivity : FragmentActivity() {
         root.addView(seriesButton, FrameLayout.LayoutParams(dp(130), dp(56),
             Gravity.TOP or Gravity.END).apply { setMargins(0, dp(112), dp(12), 0) })
         updateSeriesButton()
+        lockButton = Button(this).apply {
+            text = "🔒"
+            textSize = 22f
+            contentDescription = "Заблокировать управление камерой"
+            setOnClickListener { lockTouches() }
+        }
+        root.addView(lockButton, FrameLayout.LayoutParams(dp(62), dp(56),
+            Gravity.TOP or Gravity.START).apply { setMargins(dp(12), dp(42), 0, 0) })
         setContentView(root)
         folderButton.visibility = if (folderUri == null) View.VISIBLE else View.GONE
     }
