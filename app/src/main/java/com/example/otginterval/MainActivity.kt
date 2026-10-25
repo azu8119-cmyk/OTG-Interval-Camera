@@ -545,6 +545,84 @@ class MainActivity : FragmentActivity() {
             }
         })
     }
+    private fun lockTouches() {
+        if (touchLocked) return
+        touchLocked = true
+        settingsButton.visibility = View.GONE
+        seriesButton.visibility = View.GONE
+        lockButton.visibility = View.GONE
+        val overlay = TouchLockOverlay(this) { unlockTouches() }
+        touchLockOverlay = overlay
+        root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        applyLockedSystemBars()
+        if (prefs.getBoolean("screen_pinning", true)) {
+            try {
+                startLockTask() // Regular Android app pinning: user must accept system prompt.
+                pinRequestByApp = true
+            } catch (ex: Exception) {
+                pinRequestByApp = false
+                Toast.makeText(this,
+                    "Закрепление недоступно. Касания внутри приложения заблокированы.",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun unlockTouches() {
+        if (!touchLocked) return
+        touchLocked = false
+        touchLockOverlay?.let { root.removeView(it) }
+        touchLockOverlay = null
+        if (pinRequestByApp) {
+            pinRequestByApp = false
+            try {
+                val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                if (manager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_PINNED) {
+                    stopLockTask()
+                }
+            } catch (_: Exception) {
+                // Never prevent the user from removing the in-app touch shield.
+            }
+        }
+        settingsButton.visibility = View.VISIBLE
+        seriesButton.visibility = View.VISIBLE
+        lockButton.visibility = View.VISIBLE
+        restoreSystemBars()
+    }
+
+    private fun applyLockedSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.apply {
+                systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(WindowInsets.Type.systemBars())
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        }
+    }
+
+    private fun restoreSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.show(WindowInsets.Type.systemBars())
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && touchLocked) applyLockedSystemBars()
+    }
+
     private fun status(s: String) { statusText.text = s }
     override fun onDestroy() {
         takingSeries = false
