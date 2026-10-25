@@ -339,6 +339,19 @@ class MainActivity : FragmentActivity() {
         }
         startTimeButton.isEnabled = timeCheck.isChecked
         endTimeButton.isEnabled = timeCheck.isChecked
+        box.addView(heading("Блокировка касаний"))
+        val pinCheck = CheckBox(this).apply {
+            text = "Закреплять приложение (блокировать Home и Недавние)"
+            isChecked = prefs.getBoolean("screen_pinning", true)
+        }
+        box.addView(pinCheck)
+        box.addView(TextView(this).apply {
+            text = "Для усиленной блокировки разрешите закрепление приложений в настройках " +
+                "Samsung: Безопасность и конфиденциальность → Другие параметры безопасности " +
+                "→ Закрепление приложений. При первом запуске Android попросит подтверждение. " +
+                "Даже с закреплением системный способ выхода остаётся доступен."
+            textSize = 12f
+        })
         val choose = Button(this).apply { text = "Изменить папку" }
         val retry = Button(this).apply { text = "Переподключить USB-камеру" }
         val diag = Button(this).apply { text = "Диагностика USB" }
@@ -374,7 +387,8 @@ class MainActivity : FragmentActivity() {
                 .putString("format", formats[fmtSpin.selectedItemPosition])
                 .putBoolean("schedule_enabled", scheduleEnabled)
                 .putInt("start_minutes", startMinutes)
-                .putInt("end_minutes", endMinutes).apply()
+                .putInt("end_minutes", endMinutes)
+                .putBoolean("screen_pinning", pinCheck.isChecked).apply()
             return true
         }
         choose.setOnClickListener { if (!takingSeries && !waitingForStart) { dialog.dismiss(); chooseFolder.launch(null) } }
@@ -625,6 +639,7 @@ class MainActivity : FragmentActivity() {
 
     private fun status(s: String) { statusText.text = s }
     override fun onDestroy() {
+        if (touchLocked) unlockTouches()
         takingSeries = false
         ui.removeCallbacks(tick)
         ui.removeCallbacks(scheduleMonitor)
