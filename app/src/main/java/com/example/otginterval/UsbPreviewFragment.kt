@@ -47,9 +47,9 @@ class UsbPreviewFragment : CameraFragment() {
         code: ICameraStateCallBack.State, msg: String?) {
         val host = activity as? MainActivity ?: return
         when (code) {
-            ICameraStateCallBack.State.OPENED -> host.onUsbState(true, null)
-            ICameraStateCallBack.State.CLOSED -> host.onUsbState(false, "Камера отключена")
-            ICameraStateCallBack.State.ERROR -> host.onUsbState(false, msg ?: "Ошибка USB UVC")
+            ICameraStateCallBack.State.OPENED -> host.onUsbState(this, true, null)
+            ICameraStateCallBack.State.CLOSED -> host.onUsbState(this, false, "Камера отключена")
+            ICameraStateCallBack.State.ERROR -> host.onUsbState(this, false, msg ?: "Ошибка USB UVC")
         }
     }
     fun availableSizes(): List<Pair<Int, Int>> =
@@ -62,6 +62,9 @@ class UsbPreviewFragment : CameraFragment() {
     fun takeShot(path: String, callback: ICaptureCallBack) {
         if (!isReady()) { callback.onError("USB-камера не открыта"); return }
         captureImage(callback, path)
+    }
+    fun stopStream() {
+        closeCamera()
     }
     override fun onDestroyView() {
         texture = null
