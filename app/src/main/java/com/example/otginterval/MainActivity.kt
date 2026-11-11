@@ -46,6 +46,8 @@ class MainActivity : FragmentActivity() {
     private lateinit var folderButton: Button
     private lateinit var settingsButton: Button
     private lateinit var seriesButton: Button
+    private lateinit var snapshotButton: Button
+    private lateinit var resolutionText: TextView
     private lateinit var lockButton: Button
     private var touchLockOverlay: TouchLockOverlay? = null
     private var touchLocked = false
@@ -63,6 +65,14 @@ class MainActivity : FragmentActivity() {
     private var lastStartButtonTap = 0L
     private var cameraIsOpen = false
     private var photoCount = 0
+
+    // Keep the stream resolution visible independently of changing status messages.
+    private val resolutionRefresh = object : Runnable {
+        override fun run() {
+            updateResolutionLabel()
+            if (cameraFragment != null) ui.postDelayed(this, 1000L)
+        }
+    }
 
     private val scheduleMonitor = object : Runnable {
         override fun run() {
@@ -159,7 +169,18 @@ class MainActivity : FragmentActivity() {
             maxLines = 4
         }
         root.addView(statusText, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
-            setMargins(0, 0, 0, dp(64))
+            setMargins(0, 0, 0, dp(68))
+        })
+        resolutionText = TextView(this).apply {
+            text = "Разрешение видеопотока: —"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.argb(200, 0, 0, 0))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            maxLines = 2
+        }
+        root.addView(resolutionText, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            setMargins(0, 0, 0, dp(8))
         })
         settingsButton = Button(this).apply {
             text = "⚙"
@@ -184,6 +205,14 @@ class MainActivity : FragmentActivity() {
         root.addView(seriesButton, FrameLayout.LayoutParams(dp(130), dp(56),
             Gravity.TOP or Gravity.END).apply { setMargins(0, dp(112), dp(12), 0) })
         updateSeriesButton()
+        snapshotButton = Button(this).apply {
+            text = "Сделать снимок"
+            textSize = 14f
+            contentDescription = "Сделать один снимок с USB-камеры"
+            setOnClickListener { takeSinglePhoto() }
+        }
+        root.addView(snapshotButton, FrameLayout.LayoutParams(dp(170), dp(56),
+            Gravity.TOP or Gravity.END).apply { setMargins(0, dp(180), dp(12), 0) })
         lockButton = Button(this).apply {
             text = "🔒"
             textSize = 22f
@@ -213,19 +242,40 @@ class MainActivity : FragmentActivity() {
             return
         }
         cameraIsOpen = false
+        updateResolutionLabel()
+        ui.removeCallbacks(resolutionRefresh)
         val fragment = UsbPreviewFragment()
         cameraFragment = fragment
         supportFragmentManager.beginTransaction().replace(cameraHolder.id, fragment, "usb").commit()
+        ui.post(resolutionRefresh)
         status("Открываем USB-видеопоток. USB-устройств: " + usbCount())
     }
-    fun onUsbState(opened: Boolean, detail: String?) {
+
+    private fun disconnectCamera() {
+        if (isSessionArmed()) stopSeries()
+        ui.removeCallbacks(resolutionRefresh)
+        val fragment = cameraFragment
+        cameraFragment = null
+        cameraIsOpen = false
+        updateResolutionLabel()
+        fragment?.let {
+            it.stopStream()
+            supportFragmentManager.beginTransaction().remove(it).commit()
+        }
+        status("USB-камера отключена. Для подключения откройте ⚙ и нажмите «Переподключить».")
+    }
+
+    fun onUsbState(source: UsbPreviewFragment, opened: Boolean, detail: String?) {
         runOnUiThread {
+            // Ignore late events from a previously disconnected/replaced camera.
+            if (cameraFragment !== source) return@runOnUiThread
             cameraIsOpen = opened
-            if (!opened && (takingSeries || waitingForStart)) stopSeries()
+            if (!opened && isSessionArmed()) stopSeries()
             val size = cameraFragment?.activeSize()
             status(if (opened) "USB-камера открыта. Поток: " +
                 (size?.let { "${it.first}×${it.second}" } ?: "неизвестно") + ". Нажмите ⚙" else
                 (detail ?: "Нет видеопотока") + ". USB-устройств: " + usbCount())
+            updateResolutionLabel()
         }
     }
     private fun usbCount() = (getSystemService(Context.USB_SERVICE) as UsbManager).deviceList.size
@@ -354,10 +404,11 @@ class MainActivity : FragmentActivity() {
         })
         val choose = Button(this).apply { text = "Изменить папку" }
         val retry = Button(this).apply { text = "Переподключить USB-камеру" }
+        val disconnect = Button(this).apply { text = "Отключить камеру от телефона" }
         val diag = Button(this).apply { text = "Диагностика USB" }
         val apply = Button(this).apply { text = "Применить разрешение" }
         val saveButton = Button(this).apply { text = "Сохранить настройки" }
-        listOf(choose, retry, diag, apply, saveButton).forEach(box::addView)
+        listOf(choose, retry, disconnect, diag, apply, saveButton).forEach(box::addView)
         val dialog = AlertDialog.Builder(this).setTitle("Настройки камеры")
             .setView(ScrollView(this).apply { addView(box) })
             .setNegativeButton("Закрыть", null).create()
@@ -393,6 +444,7 @@ class MainActivity : FragmentActivity() {
         }
         choose.setOnClickListener { if (!takingSeries && !waitingForStart) { dialog.dismiss(); chooseFolder.launch(null) } }
         retry.setOnClickListener { dialog.dismiss(); reconnectPreview() }
+        disconnect.setOnClickListener { dialog.dismiss(); disconnectCamera() }
         diag.setOnClickListener { diagnostics() }
         apply.setOnClickListener {
             if (!takingSeries && !waitingForStart && save()) { dialog.dismiss(); reconnectPreview() }
@@ -406,6 +458,20 @@ class MainActivity : FragmentActivity() {
         dialog.show()
     }
     private fun isSessionArmed() = takingSeries || waitingForStart
+
+    private fun takeSinglePhoto() {
+        if (folderUri == null || !cameraIsOpen || cameraFragment?.isReady() != true) {
+            Toast.makeText(this, "Сначала выберите папку и подключите USB-камеру",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!writing.compareAndSet(false, true)) {
+            Toast.makeText(this, "Предыдущий снимок ещё сохраняется",
+                Toast.LENGTH_SHORT).show()
+            return
+        }
+        capture()
+    }
 
     private fun updateSeriesButton() {
         seriesButton.text = when {
@@ -564,6 +630,7 @@ class MainActivity : FragmentActivity() {
         touchLocked = true
         settingsButton.visibility = View.GONE
         seriesButton.visibility = View.GONE
+        snapshotButton.visibility = View.GONE
         lockButton.visibility = View.GONE
         val overlay = TouchLockOverlay(this) { unlockTouches() }
         touchLockOverlay = overlay
@@ -600,6 +667,7 @@ class MainActivity : FragmentActivity() {
         }
         settingsButton.visibility = View.VISIBLE
         seriesButton.visibility = View.VISIBLE
+        snapshotButton.visibility = View.VISIBLE
         lockButton.visibility = View.VISIBLE
         restoreSystemBars()
     }
@@ -637,12 +705,22 @@ class MainActivity : FragmentActivity() {
         if (hasFocus && touchLocked) applyLockedSystemBars()
     }
 
+    private fun updateResolutionLabel() {
+        val size = if (cameraIsOpen) cameraFragment?.activeSize() else null
+        resolutionText.text = when {
+            !cameraIsOpen -> "Разрешение видеопотока: — (камера не подключена)"
+            size != null -> "Разрешение видеопотока: ${size.first} × ${size.second}"
+            else -> "Разрешение видеопотока: определяется…"
+        }
+    }
+
     private fun status(s: String) { statusText.text = s }
     override fun onDestroy() {
         if (touchLocked) unlockTouches()
         takingSeries = false
         ui.removeCallbacks(tick)
         ui.removeCallbacks(scheduleMonitor)
+        ui.removeCallbacks(resolutionRefresh)
         writer.shutdown()
         super.onDestroy()
     }
